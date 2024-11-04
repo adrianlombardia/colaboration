@@ -1,0 +1,132 @@
+const { Envio, Producto } = require('../models');
+
+const crearEnvio = async (req, res) => {
+    try {
+        console.log('Datos recibidos en la solicitud:', req.body);
+
+        // Mapeo de los datos recibidos a los campos definidos en el modelo
+        const nuevoEnvio = await Envio.create({
+            envio: req.body.envio,
+            almacen: req.body.almacen,
+            fecha_comienzo_recoleccion: req.body.fecha_comienzo_recoleccion,
+            fecha_entrega_aproximada: req.body.fecha_entrega_aproximada,
+            almacen_destino: req.body.almacen_destino,
+            direccion_destino: req.body.direccion,
+            ciudad_destino: req.body.ciudad,
+            codigo_postal_destino: req.body.codigo_postal,
+            pais_destino: req.body.pais,
+            telefono_destino: req.body.telefono,
+            email_contacto_destino: req.body.email_contacto,
+            persona_contacto_envio: req.body.persona_contacto_envio,
+            persona_contacto_recepcion: req.body.persona_contacto_recepcion,
+        });
+
+        console.log('Nuevo envío creado:', nuevoEnvio);
+        res.status(201).json({ mensaje: 'Envío creado con éxito', envio: nuevoEnvio });
+    } catch (error) {
+        console.error('Error al crear envío:', error);
+        res.status(500).json({ mensaje: 'Error al crear el envío', error: error.message });
+    }
+};
+
+
+const obtenerEnvios = async (req, res) => {
+    try {
+        const envios = await Envio.findAll();
+        res.status(200).json(envios);
+    } catch (error) {
+        console.error('Error al obtener envíos:', error);
+        res.status(500).json({ mensaje: 'Error al obtener los envíos' });
+    }
+};
+
+const obtenerEnvioPorId = async (req, res) => {
+    try {
+        const envio = await Envio.findByPk(req.params.id);
+        if (!envio) {
+            return res.status(404).json({ mensaje: 'Envío no encontrado' });
+        }
+        res.status(200).json(envio);
+    } catch (error) {
+        console.error('Error al obtener el envío:', error);
+        res.status(500).json({ mensaje: 'Error al obtener el envío' });
+    }
+};
+const obtenerEnvioConProductos = async (req, res) => {
+    try {
+        const envioId = req.params.id;
+        const envio = await Envio.findByPk(envioId, {
+            include: [{ model: Producto, as: 'productos' }], // Usa el alias definido en la asociación
+        });
+        if (!envio) {
+            return res.status(404).json({ mensaje: 'Envío no encontrado' });
+        }
+
+        // Agrupar productos por id y sumar sus cantidades
+        const cantidadesPorProducto = envio.productos.reduce((acc, producto) => {
+            const productoId = producto.id;
+            const cantidad = producto.ProductoEnvio?.cantidad || 0;
+
+            if (acc[productoId]) {
+                acc[productoId] += cantidad;
+            } else {
+                acc[productoId] = cantidad;
+            }
+            return acc;
+        }, {});
+
+        // Añadir la cantidad total a cada producto
+        envio.productos = envio.productos.map(producto => {
+            return {
+                ...producto.get(),
+                cantidadTotal: cantidadesPorProducto[producto.id] || 0
+            };
+        });
+
+        res.status(200).json({
+            productos: envio.productos,
+        });
+    } catch (error) {
+        console.error('Error al obtener los productos del envío:', error);
+        res.status(500).json({ mensaje: 'Error al obtener los productos del envío' });
+    }
+};
+
+
+
+const actualizarEnvio = async (req, res) => {
+    try {
+        const envio = await Envio.findByPk(req.params.id);
+        if (!envio) {
+            return res.status(404).json({ mensaje: 'Envío no encontrado' });
+        }
+        await envio.update(req.body);
+        res.status(200).json({ mensaje: 'Envío actualizado con éxito', envio });
+    } catch (error) {
+        console.error('Error al actualizar el envío:', error);
+        res.status(500).json({ mensaje: 'Error al actualizar el envío' });
+    }
+};
+
+const eliminarEnvio = async (req, res) => {
+    try {
+        const envio = await Envio.findByPk(req.params.id);
+        if (!envio) {
+            return res.status(404).json({ mensaje: 'Envío no encontrado' });
+        }
+        await envio.destroy();
+        res.status(200).json({ mensaje: 'Envío eliminado con éxito' });
+    } catch (error) {
+        console.error('Error al eliminar el envío:', error);
+        res.status(500).json({ mensaje: 'Error al eliminar el envío' });
+    }
+};
+
+module.exports = {
+    crearEnvio,
+    obtenerEnvios,
+    obtenerEnvioPorId,
+    obtenerEnvioConProductos,
+    actualizarEnvio,
+    eliminarEnvio,
+};
